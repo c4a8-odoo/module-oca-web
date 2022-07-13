@@ -12,5 +12,10 @@
     "license": "LGPL-3",
     "application": False,
     "installable": True,
+    "assets": {
+        "web.assets_backend": [
+            "/web_calendar_slot_duration/static/src/js/calendar_model.js"
+        ]
+    },
     "depends": ["web"],
 }
