@@ -14,7 +14,7 @@
     "installable": True,
     "assets": {
         "web.assets_backend": [
-            "/web_calendar_slot_duration/static/src/js/calendar_model.js"
+            "web_calendar_slot_duration/static/src/js/calendar_model.js"
         ]
     },
     "depends": ["web"],
