@@ -11,6 +11,8 @@ odoo.define("web_m2x_options.web_m2x_options", function (require) {
         relational_fields = require("web.relational_fields"),
         ir_options = require("web_m2x_options.ir_options");
 
+    const {escape} = owl.utils;
+    const {sprintf} = require("web.utils");
     var _t = core._t,
         FieldMany2ManyTags = relational_fields.FieldMany2ManyTags,
         FieldMany2One = relational_fields.FieldMany2One,
@@ -108,248 +110,13 @@ odoo.define("web_m2x_options.web_m2x_options", function (require) {
             }
         },
 
-        _search: function (search_val) {
-            var self = this;
-
-            var def = new Promise((resolve) => {
-                // Add options limit used to change number of selections record
-                // returned.
-                if (!_.isUndefined(ir_options["web_m2x_options.limit"])) {
-                    this.limit = parseInt(ir_options["web_m2x_options.limit"], 10);
-                }
-
-                if (typeof self.nodeOptions.limit === "number") {
-                    self.limit = self.nodeOptions.limit;
-                }
-
-                // Add options field_color and colors to color item(s) depending on field_color value
-                self.field_color = self.nodeOptions.field_color;
-                self.colors = self.nodeOptions.colors;
-
-                var context = self.record.getContext(self.recordParams);
-                var domain = self.record.getDomain(self.recordParams);
-
-                var blacklisted_ids = self._getSearchBlacklist();
-                if (blacklisted_ids.length > 0) {
-                    domain.push(["id", "not in", blacklisted_ids]);
-                }
-
-                self._rpc({
-                    model: self.field.relation,
-                    method: "name_search",
-                    kwargs: {
-                        name: search_val,
-                        args: domain,
-                        operator: "ilike",
-                        limit: self.limit + 1,
-                        context: context,
-                    },
-                }).then((result) => {
-                    // Possible selections for the m2o
-                    var values = _.map(result, (x) => {
-                        x[1] = self._getDisplayName(x[1]);
-                        return {
-                            label:
-                                _.str.escapeHTML(x[1].trim()) || data.noDisplayContent,
-                            value: x[1],
-                            name: x[1],
-                            id: x[0],
-                        };
-                    });
-
-                    // Search result value colors
-                    if (self.colors && self.field_color) {
-                        var value_ids = [];
-                        for (var val_index in values) {
-                            value_ids.push(values[val_index].id);
-                        }
-                        self._rpc({
-                            model: self.field.relation,
-                            method: "search_read",
-                            fields: [self.field_color],
-                            domain: [["id", "in", value_ids]],
-                        }).then((objects) => {
-                            for (var index in objects) {
-                                for (var index_value in values) {
-                                    if (values[index_value].id === objects[index].id) {
-                                        // Find value in values by comparing ids
-                                        var value = values[index_value];
-                                        // Find color with field value as key
-                                        var color =
-                                            self.colors[
-                                                objects[index][self.field_color]
-                                            ] || "black";
-                                        value.label =
-                                            '<span style="color:' +
-                                            color +
-                                            '">' +
-                                            value.label +
-                                            "</span>";
-                                        break;
-                                    }
-                                }
-                            }
-                            resolve(values);
-                        });
-                    }
-
-                    // Search more...
-                    // Resolution order:
-                    // 1- check if "search_more" is set locally in node's options
-                    // 2- if set locally, apply its value
-                    // 3- if not set locally, check if it's set globally via ir.config_parameter
-                    // 4- if set globally, apply its value
-                    // 5- if not set globally either, check if returned values are more than node's limit
-                    if (!_.isUndefined(self.nodeOptions.search_more)) {
-                        var search_more = is_option_set(self.nodeOptions.search_more);
-                    } else if (
-                        !_.isUndefined(ir_options["web_m2x_options.search_more"])
-                    ) {
-                        var search_more = is_option_set(
-                            ir_options["web_m2x_options.search_more"]
-                        );
-                    } else {
-                        var search_more = values.length > self.limit;
-                    }
-
-                    if (search_more) {
-                        values = values.slice(0, self.limit);
-                        values.push({
-                            label: _t("Search More..."),
-                            action: function () {
-                                var prom = [];
-                                if (search_val !== "") {
-                                    prom = self._rpc({
-                                        model: self.field.relation,
-                                        method: "name_search",
-                                        kwargs: {
-                                            name: search_val,
-                                            args: domain,
-                                            operator: "ilike",
-                                            limit: self.SEARCH_MORE_LIMIT,
-                                            context: context,
-                                        },
-                                    });
-                                }
-                                Promise.resolve(prom).then(function (results) {
-                                    var dynamicFilters = [];
-                                    if (results) {
-                                        var ids = _.map(results, function (x) {
-                                            return x[0];
-                                        });
-                                        if (search_val) {
-                                            dynamicFilters = [
-                                                {
-                                                    description: _.str.sprintf(
-                                                        _t("Quick search: %s"),
-                                                        search_val
-                                                    ),
-                                                    domain: [["id", "in", ids]],
-                                                },
-                                            ];
-                                        } else {
-                                            dynamicFilters = [];
-                                        }
-                                    }
-                                    self._searchCreatePopup(
-                                        "search",
-                                        false,
-                                        {},
-                                        dynamicFilters
-                                    );
-                                });
-                            },
-                            classname: "o_m2o_dropdown_option",
-                        });
-                    }
-
-                    var create_enabled = self.can_create && !self.nodeOptions.no_create;
-                    // Quick create
-                    var raw_result = _.map(result, function (x) {
-                        return x[1];
-                    });
-                    var quick_create = is_option_set(self.nodeOptions.create),
-                        quick_create_undef = _.isUndefined(self.nodeOptions.create),
-                        m2x_create_undef = _.isUndefined(
-                            ir_options["web_m2x_options.create"]
-                        ),
-                        m2x_create = is_option_set(
-                            ir_options["web_m2x_options.create"]
-                        );
-                    var show_create =
-                        (!self.nodeOptions && (m2x_create_undef || m2x_create)) ||
-                        (self.nodeOptions &&
-                            (quick_create ||
-                                (quick_create_undef &&
-                                    (m2x_create_undef || m2x_create))));
-                    if (
-                        create_enabled &&
-                        !self.nodeOptions.no_quick_create &&
-                        search_val.length > 0 &&
-                        !_.contains(raw_result, search_val) &&
-                        show_create
-                    ) {
-                        values.push({
-                            label: _.str.sprintf(
-                                _t('Create "<strong>%s</strong>"'),
-                                $("<span />").text(search_val).html()
-                            ),
-                            action: self._quickCreate.bind(self, search_val),
-                            classname: "o_m2o_dropdown_option",
-                        });
-                    }
-                    // Create and edit ...
-
-                    var create_edit =
-                            is_option_set(self.nodeOptions.create) ||
-                            is_option_set(self.nodeOptions.create_edit),
-                        create_edit_undef =
-                            _.isUndefined(self.nodeOptions.create) &&
-                            _.isUndefined(self.nodeOptions.create_edit),
-                        m2x_create_edit_undef = _.isUndefined(
-                            ir_options["web_m2x_options.create_edit"]
-                        ),
-                        m2x_create_edit = is_option_set(
-                            ir_options["web_m2x_options.create_edit"]
-                        );
-                    var show_create_edit =
-                        (!self.nodeOptions &&
-                            (m2x_create_edit_undef || m2x_create_edit)) ||
-                        (self.nodeOptions &&
-                            (create_edit ||
-                                (create_edit_undef &&
-                                    (m2x_create_edit_undef || m2x_create_edit))));
-                    if (
-                        create_enabled &&
-                        !self.nodeOptions.no_create_edit &&
-                        show_create_edit
-                    ) {
-                        var createAndEditAction = function () {
-                            // Clear the value in case the user clicks on discard
-                            self.$("input").val("");
-                            return self._searchCreatePopup(
-                                "form",
-                                false,
-                                self._createContext(search_val)
-                            );
-                        };
-                        values.push({
-                            label: _t("Create and Edit..."),
-                            action: createAndEditAction,
-                            classname: "o_m2o_dropdown_option",
-                        });
-                    } else if (values.length === 0) {
-                        values.push({
-                            label: _t("No results to show..."),
-                        });
-                    }
-                    // Check if colors specified to wait for RPC
-                    if (!(self.field_color && self.colors)) {
-                        resolve(values);
-                    }
-                });
-            });
-            this.orderer.add(def);
+        _search: async function (searchValue = "") {
+            const value = searchValue.trim();
+            const domain = this.record.getDomain(this.recordParams);
+            const context = Object.assign(
+                this.record.getContext(this.recordParams),
+                this.additionalContext
+            );
 
             // Add options limit used to change number of selections record
             // returned.
@@ -361,7 +128,125 @@ odoo.define("web_m2x_options.web_m2x_options", function (require) {
                 this.limit = this.nodeOptions.limit;
             }
 
-            return def;
+            // Exclude black-listed ids from the domain
+            const blackListedIds = this._getSearchBlacklist();
+            if (blackListedIds.length) {
+                domain.push(["id", "not in", blackListedIds]);
+            }
+
+            const nameSearch = this._rpc({
+                model: this.field.relation,
+                method: "name_search",
+                kwargs: {
+                    name: value,
+                    args: domain,
+                    operator: "ilike",
+                    limit: this.limit + 1,
+                    context,
+                },
+            });
+            const results = await this.orderer.add(nameSearch);
+
+            // Format results to fit the options dropdown
+            let values = results.map((result) => {
+                const [id, fullName] = result;
+                const displayName = this._getDisplayName(fullName).trim();
+                result[1] = displayName;
+                return {
+                    id,
+                    label: escape(displayName) || data.noDisplayContent,
+                    value: displayName,
+                    name: displayName,
+                };
+            });
+
+            // Search more...
+            // Resolution order:
+            // 1- check if "search_more" is set locally in node's options
+            // 2- if set locally, apply its value
+            // 3- if not set locally, check if it's set globally via ir.config_parameter
+            // 4- if set globally, apply its value
+            // 5- if not set globally either, check if returned values are more than node's limit
+            if (!_.isUndefined(this.nodeOptions.search_more)) {
+                var search_more = is_option_set(this.nodeOptions.search_more);
+            } else if (!_.isUndefined(ir_options["web_m2x_options.search_more"])) {
+                var search_more = is_option_set(
+                    ir_options["web_m2x_options.search_more"]
+                );
+            } else {
+                var search_more = values.length > this.limit;
+            }
+
+            // Add "Search more..." option if results count is higher than the limit
+            if (search_more) {
+                values = this._manageSearchMore(values, value, domain, context);
+            }
+
+            // Global create settings
+            var m2x_create_undef = _.isUndefined(ir_options["web_m2x_options.create"]),
+                m2x_create = is_option_set(ir_options["web_m2x_options.create"]),
+                m2x_create_edit_undef = _.isUndefined(
+                    ir_options["web_m2x_options.create_edit"]
+                ),
+                m2x_create_edit = is_option_set(
+                    ir_options["web_m2x_options.create_edit"]
+                );
+
+            // Additional options...
+            const canQuickCreate =
+                this.can_create &&
+                !this.nodeOptions.no_quick_create &&
+                !m2x_create_undef &&
+                m2x_create;
+
+            const canCreateEdit =
+                this.can_create &&
+                !this.nodeOptions.no_create_edit &&
+                !m2x_create_edit_undef &&
+                m2x_create_edit;
+
+            if (value.length) {
+                // "Quick create" option
+                const nameExists = results.some((result) => result[1] === value);
+                if (canQuickCreate && !nameExists) {
+                    values.push({
+                        label: sprintf(
+                            _t(`Create "<strong>%s</strong>"`),
+                            escape(value)
+                        ),
+                        action: () => this._quickCreate(value),
+                        classname: "o_m2o_dropdown_option",
+                    });
+                }
+                // "Create and Edit" option
+                if (canCreateEdit) {
+                    const valueContext = this._createContext(value);
+                    values.push({
+                        label: _t("Create and Edit..."),
+                        action: () => {
+                            // Input value is cleared and the form popup opens
+                            this.el.querySelector(":scope input").value = "";
+                            return this._searchCreatePopup("form", false, valueContext);
+                        },
+                        classname: "o_m2o_dropdown_option",
+                    });
+                }
+                // "No results" option
+                if (!values.length) {
+                    values.push({
+                        label: _t("No records"),
+                        classname: "o_m2o_no_result",
+                    });
+                }
+            } else if (!this.value && (canQuickCreate || canCreateEdit)) {
+                // "Start typing" option
+                values.push({
+                    label: _t("Start typing..."),
+                    classname: "o_m2o_start_typing",
+                });
+            }
+
+            return values;
         },
     });
 
