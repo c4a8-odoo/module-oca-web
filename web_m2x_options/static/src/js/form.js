@@ -20,9 +20,15 @@ odoo.define("web_m2x_options.web_m2x_options", function (require) {
         FormFieldMany2ManyTags = relational_fields.FormFieldMany2ManyTags;
 
     function is_option_set(option) {
-        if (_.isUndefined(option)) return false;
-        if (typeof option === "string") return option === "true" || option === "True";
-        if (typeof option === "boolean") return option;
+        if (_.isUndefined(option)) {
+            return false;
+        }
+        if (typeof option === "string") {
+            return option === "true" || option === "True";
+        }
+        if (typeof option === "boolean") {
+            return option;
+        }
         return false;
     }
 
@@ -106,39 +112,38 @@ odoo.define("web_m2x_options.web_m2x_options", function (require) {
         }),
 
         _canCreate: function () {
-            const self = this;
-            return self.can_create && !self.nodeOptions.no_create;
+            return this.can_create && !this.nodeOptions.no_create;
         },
 
         _canShowQuickCreate: function () {
-            const self = this;
-
-            var quick_create = is_option_set(self.nodeOptions.create),
-                quick_create_undef = _.isUndefined(self.nodeOptions.create),
+            var quick_create = is_option_set(this.nodeOptions.create),
+                quick_create_undef = _.isUndefined(this.nodeOptions.create),
                 m2x_create_undef = _.isUndefined(ir_options["web_m2x_options.create"]),
                 m2x_create = is_option_set(ir_options["web_m2x_options.create"]);
 
-            if (!quick_create_undef) return quick_create;
+            if (!quick_create_undef) {
+                return quick_create;
+            }
 
-            if (!_.isUndefined(self.nodeOptions.no_quick_create))
-                return !self.nodeOptions.no_quick_create;
+            if (!_.isUndefined(this.nodeOptions.no_quick_create))
+                return !this.nodeOptions.no_quick_create;
 
-            if (!m2x_create_undef) return m2x_create;
+            if (!m2x_create_undef) {
+                return m2x_create;
+            }
 
             return true;
         },
 
         _canShowCreateAndEdit: function () {
-            const self = this;
-
             var create_edit =
-                    is_option_set(self.nodeOptions.create) ||
-                    is_option_set(self.nodeOptions.create_edit) ||
-                    !is_option_set(self.nodeOptions.no_create_edit),
+                    is_option_set(this.nodeOptions.create) ||
+                    is_option_set(this.nodeOptions.create_edit) ||
+                    !is_option_set(this.nodeOptions.no_create_edit),
                 create_edit_undef =
-                    _.isUndefined(self.nodeOptions.create) &&
-                    _.isUndefined(self.nodeOptions.create_edit) &&
-                    _.isUndefined(self.nodeOptions.no_create_edit),
+                    _.isUndefined(this.nodeOptions.create) &&
+                    _.isUndefined(this.nodeOptions.create_edit) &&
+                    _.isUndefined(this.nodeOptions.no_create_edit),
                 m2x_create_edit_undef = _.isUndefined(
                     ir_options["web_m2x_options.create_edit"]
                 ),
@@ -146,9 +151,13 @@ odoo.define("web_m2x_options.web_m2x_options", function (require) {
                     ir_options["web_m2x_options.create_edit"]
                 );
 
-            if (!create_edit_undef) return create_edit;
+            if (!create_edit_undef) {
+                return create_edit;
+            }
 
-            if (!m2x_create_edit_undef) return m2x_create_edit;
+            if (!m2x_create_edit_undef) {
+                return m2x_create_edit;
+            }
 
             return true;
         },
@@ -160,7 +169,9 @@ odoo.define("web_m2x_options.web_m2x_options", function (require) {
                 m2o_dialog_remove_buttons = is_option_set(
                     ir_options["web_m2x_options.m2o_dialog_remove_buttons"]
                 );
-            if (!m2o_dialog_remove_buttons_undef) return m2o_dialog_remove_buttons;
+            if (!m2o_dialog_remove_buttons_undef) {
+                return m2o_dialog_remove_buttons;
+            }
             return false;
         },
 
