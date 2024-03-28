@@ -3,7 +3,7 @@
 import {patch} from "@web/core/utils/patch";
 import {ListController} from "@web/views/list/list_controller";
 
-patch(ListController.prototype, "web_group_expand.ListController", {
+patch(ListController.prototype, {
     async expandAllGroups() {
         // We expand layer by layer. So first we need to find the highest
         // layer that's not already fully expanded.
