@@ -5,7 +5,7 @@
     "name": "Web Many2one Color State",
     "summary": "Color the selected value of many2one fields "
     "depending on a color state of the target record",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Web",
     "author": "glueckkanja AG, Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/web",
